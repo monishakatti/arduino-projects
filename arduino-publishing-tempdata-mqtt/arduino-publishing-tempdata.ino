@@ -1,43 +1,36 @@
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiServer.h>
-#include <WiFiUdp.h>
 
 
+#include <SoftwareSerial.h>
+
+#include <PubSubClient.h>
 
 #include <WiFiEsp.h>
 #include <WiFiEspClient.h>
 #include <WiFiEspServer.h>
 #include <WiFiEspUdp.h>
 
-#include <PubSubClient.h>
-
-#include <SoftwareSerial.h>
-
-#include <Adafruit_Sensor.h>
-
- 
+#include <DHT.h>
 
 
 
 
-#define WIFI_AP "katti"
-#define WIFI_PASSWORD "Authorized"
+
+#define WIFI_AP "wifiname"
+#define WIFI_PASSWORD "wifipassword"
 
 #define TOKEN "ARDUINO_DEMO_TOKEN"
 
-#define trigPin 13
-#define echoPin 12
+// DHT
+#define DHTPIN A0
+#define DHTTYPE DHT22
 
-
-
-char server[] = "rnsit7.iotalchemy.com";
+char server[] = "testserver.com"; //provide your sever name
 
 // Initialize the Ethernet client object
 WiFiEspClient espClient;
 
 // Initialize DHT sensor.
-
+DHT dht(DHTPIN, DHTTYPE);
 
 PubSubClient client(espClient);
 
@@ -49,10 +42,8 @@ unsigned long lastSend;
 void setup() {
   // initialize serial for debugging
   Serial.begin(9600);
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  
-   InitWiFi();
+  dht.begin();
+  InitWiFi();
   client.setServer( server, 1883 );
   lastSend = 0;
 }
@@ -84,46 +75,46 @@ void loop() {
 
 void getAndSendTemperatureAndHumidityData()
 {
-  Serial.println("Collecting data.");
-    long duration, distance;
+  Serial.println("Collecting temperature data.");
 
-  digitalWrite(trigPin, LOW);  // Added this line
-  delayMicroseconds(2); // Added this line
-  digitalWrite(trigPin, HIGH);
-//  delayMicroseconds(1000); - Removed this line
-  delayMicroseconds(10); // Added this line
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-  distance = (duration/2) / 29.1;
+  // Reading temperature or humidity takes about 250 milliseconds!
+  float h = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  float t = dht.readTemperature();
+
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
   }
 
-   if (distance >= 200){
-    Serial.print("Out of range");
-  }
-  else {
-    Serial.print(distance);
-    Serial.print(" cm");
-  }
-  delay(500);
+  Serial.print("Humidity: ");
+  Serial.print(h);
+  Serial.print(" %\t");
+  Serial.print("Temperature: ");
+  Serial.print(t);
+  Serial.print(" *C ");
 
-  
-  String distace = String(d);
- 
+  String temperature = String(t);
+  String humidity = String(h);
 
 
   // Just debug messages
-  Serial.print( "distace is : " );
-  Serial.print( distance ); 
-  
+  Serial.print( "Sending temperature and humidity : [" );
+  Serial.print( temperature ); Serial.print( "," );
+  Serial.print( humidity );
+  Serial.print( "]   -> " );
+
   // Prepare a JSON payload string
   String payload = "{";
-  payload += "\"distance\":"; payload += distance; payload += ",";
+  payload += "\"temperature\":"; payload += temperature; payload += ",";
+  payload += "\"humidity\":"; payload += humidity;
   payload += "}";
 
   // Send payload
   char attributes[100];
   payload.toCharArray( attributes, 100 );
-  client.publish( "hello", attributes );
+  client.publish( "hello topic", attributes );
   Serial.println( attributes );
 }
 
